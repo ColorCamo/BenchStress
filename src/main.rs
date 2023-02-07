@@ -16,9 +16,9 @@ fn main() {
     let mut sys = System::new_all();
 
     // Display system information:s
-    println!("Hello {}!", sys.host_name().unwrap());
-    println!("OS: {} v{}", sys.long_os_version().unwrap(), sys.kernel_version().unwrap());
-    println!("CPU: {:?} cores {:?} threads", sys.physical_core_count().unwrap(),  sys.cpus().len());
+    println!("Hello {}!", sys.host_name().unwrap_or_else(|| "User".to_string());
+    println!("OS: {} v{}", sys.long_os_version().unwrap_or_else(|| "N/A".to_string()), sys.kernel_version().unwrap_or_else(|| "N/A".to_string()));
+    println!("CPU: {:?} cores {:?} threads", sys.physical_core_count().unwrap_or(0),  sys.cpus().len());
     println!("Memory: {:?} GBs", sys.total_memory() / 1024 / 1024 / 1024);
 
     const CPU_QUESTION_INDEXES: [i32; 3] = [0, 3, 4];
@@ -34,7 +34,11 @@ fn main() {
                 .message("How many CPU(s) would you like to use?")
                 .choices((1..=sys.cpus().len()).map(|cpu| format!("{} CPU(s)", cpu)).collect::<Vec<String>>())
                 .when(|ans: &requestty::Answers| {
-                    let index_chosen = ans["main_question"].as_list_item().unwrap().index as i32;
+                    let index_chose = ans.get("main_question")
+                        .expect("Main question was not found. This should not have happened")
+                        .as_list_item()
+                        .expect("Type of the Main question was not a ListItem.. This should not have happened!")
+                        .index as i32;
                     CPU_QUESTION_INDEXES.contains(&index_chosen)
                 })
                 .build(),
@@ -52,7 +56,12 @@ fn main() {
             Question::int("duration")
                 .message("How long would you like the test to be? (In Minutes)")
                 .when(|ans: &requestty::Answers| {
-                    ans["how_test"].as_list_items().unwrap().iter().any(|item| item.index == 0)
+                    ans.get("how_test")
+                        .expect("The 'How would you like to terminate question' could not be found. This should not have happened!")
+                        .as_list_items()
+                        .expect("Type of the 'How would you like to terminate' question has been changed. This should not have happened!")
+                        .iter()
+                        .any(|li| li.index == 0)
                 })
                 .default(1)
                 // lol why not
@@ -246,3 +255,4 @@ fn pretty_print_int(i: u64) -> String {
     }
     s
 }
+
