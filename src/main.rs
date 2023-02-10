@@ -3,9 +3,11 @@ pub mod sensors;
 mod reporting;
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicUsize};
+use std::sync::atomic::Ordering::Relaxed;
 use std::thread;
 use std::time::{Duration, Instant};
+use colored:Colorize;
 use requestty::{Question};
 use sysinfo::{System, SystemExt};
 use crate::reporting::watch_in_background;
@@ -190,10 +192,13 @@ pub fn do_cpu_work(
     system: &mut System,
 )  -> Result<Job, String> {
     let start_time = Instant::now();
-    let running = Arc::new(AtomicBool::new(true));
+    let running = Arc::new(AtomicUsize::new(0));
 
     let atomic_bool = running.clone();
     let function = get_stressor_functions(method);
+
+    let start_text = format!(" Starting {}. If you wish to stop the test at any point hold Control+C", method).white().bold().to_string();
+    println!("{}", start_text);
 
     thread::scope(move |scope| {
         let mut handles = Vec::with_capacity(cpu_count);
@@ -203,7 +208,7 @@ pub fn do_cpu_work(
             let handle = scope.spawn(move ||
                 {
                     let mut iterations: u64 = 0;
-                    while thread_running.load(Ordering::Relaxed)
+                    while thread_running.load(Relaxed) == 0
                     {
                         function();
                         iterations += 1;
@@ -222,6 +227,13 @@ pub fn do_cpu_work(
             atomic_bool,
         );
 
+        let stop_reason = match running.load(Relaxed) {
+            1 => "Time Limit exceeded",
+            2 => "Temperature exceeded",
+            3 => "Ctrl-C caught",
+            _ => panic!("This should have never happened. {} is not a valid option", running.load(Relaxed))
+        }.to_string();
+
         let mut total_iterations = 0;
         for handle in handles {
             if let Ok(iterations) = handle.join() {
@@ -237,7 +249,7 @@ pub fn do_cpu_work(
                 name: method.to_string(),
                 total_iterations,
                 cpu_count,
-                stop_reasoning: background_report.stop_reason,
+                stop_reasoning: stop_reason,
                 average_cpu_temp: background_report.average_cpu_temp,
                 min_cpu_temp: background_report.min_cpu_temp,
                 max_cpu_temp: background_report.max_cpu_temp,
