@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicUsize};
 use std::sync::atomic::Ordering::Relaxed;
 use std::thread;
 use std::time::{Duration, Instant};
-use colored:Colorize;
+use colored::Colorize;
 use requestty::{Question};
 use sysinfo::{System, SystemExt};
 use crate::reporting::watch_in_background;
@@ -125,13 +125,11 @@ fn main() {
                 .and_then(|d| d.as_list_item())
                 .map(|method| STRESSORS[method.index])
                 .unwrap_or(STRESSORS[0]);
-
             let cpus = answers.get("cpu_question")
                 .expect("CPU Option was chosen and no cpu count was given. We gotta go bye bye.")
                 .as_list_item()
                 .expect("Type of 'How many CPU(s) question was changed'. This should not have happened")
                 .index + 1;
-
 
             match do_cpu_work(method, cpus, temperature, duration, &mut sys) {
                 Ok(job) => println!("{}", job),
@@ -163,9 +161,7 @@ fn get_termination_options(
     options.push("Time".to_string());
     if sensors::cpu_temp(sys, false).is_some()  {
         options.push("Temperature".to_string());
-
     }
-    options.push("Until I say stop (Control+C)".to_string());
     options
 }
 
@@ -190,15 +186,16 @@ pub fn do_cpu_work(
     stop_temperature: Option<i64>,
     duration: Option<Duration>,
     system: &mut System,
-)  -> Result<Job, String> {
+) -> Result<Job, String> {
     let start_time = Instant::now();
     let running = Arc::new(AtomicUsize::new(0));
 
     let atomic_bool = running.clone();
     let function = get_stressor_functions(method);
 
-    let start_text = format!(" Starting {}. If you wish to stop the test at any point hold Control+C", method).white().bold().to_string();
+    let start_text = format!("🏁 Starting {}. If you wish to stop the test at any point hold Control+C", method).white().bold().to_string();
     println!("{}", start_text);
+
 
     thread::scope(move |scope| {
         let mut handles = Vec::with_capacity(cpu_count);
@@ -214,7 +211,7 @@ pub fn do_cpu_work(
                         iterations += 1;
                     }
                     iterations
-            });
+                });
             handles.push(handle);
         }
 
@@ -271,28 +268,25 @@ pub struct Job {
 
 impl std::fmt::Display for Job {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "\n📊 {} Stress Test Results 📊", self.name)?;
+        write!(f, "\n{} Stress Test Results ", self.name)?;
 
-        let minimum_temp = match self.min_cpu_temp {
-            Some(temp) => format!("🌡️ Minimum CPU Temperature: {:.2}°C", temp),
-            None => String::new()
-        };
+        write!(f, "\n⇁ Job Name: {} \n⇁ Total Iterations: {} \n⇁ CPU Count: {} \n⇁ Stop Reasoning: {}",
+               self.name, pretty_print_int(self.total_iterations), self.cpu_count, self.stop_reasoning)?;
 
-        let maximum_temp = match self.max_cpu_temp {
-            Some(temp) => format!("🌡️ Max CPU Temperature: {:.2}°C", temp),
-            None => String::new()
-        };
+        if let Some(max_temp) = self.max_cpu_temp {
+            write!(f, "\n⇁ Maximum CPU Temperature: {:.2}°C", max_temp)?;
+        }
 
-        let average_cpu = match self.average_cpu_temp {
-            Some(temp) => format!("🌡️ Average CPU Temperature: {:.2}°C", temp),
-            None => String::new()
-        };
+        if let Some(min_temp) = self.min_cpu_temp {
+            write!(f, "\n⇁ Max CPU Temperature: {:.2}°C", min_temp)?;
+        }
 
-
+        if let Some(average_temp) = self.average_cpu_temp {
+            write!(f, "\n⇁ Max CPU Temperature: {:.2}°C", average_temp)?;
+        }
 
 
-        write!(f, "\n🔥 Job Name: {} \n🔥 Total Iterations: {} \n🔥 CPU Count: {} \n⛔️ Stop Reasoning: {} \n{} \n{} \n{}",
-               self.name, pretty_print_int(self.total_iterations), self.cpu_count, self.stop_reasoning, minimum_temp, maximum_temp, average_cpu)
+        Ok(())
     }
 }
 
